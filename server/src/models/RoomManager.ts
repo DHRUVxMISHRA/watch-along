@@ -67,6 +67,10 @@ export class Room {
       role = existing.role;
     }
 
+    // A reconnect keeps the same stable userId.  Remove the old socket mapping
+    // before replacing it, but retain the participant's role and joined time.
+    if (existing?.socketId) this.socketToUser.delete(existing.socketId);
+
     const participant: Participant = {
       userId,
       socketId,
@@ -116,6 +120,16 @@ export class Room {
         }
       }
     }
+    return participant;
+  }
+
+  /** Detach a transiently disconnected socket without changing room membership. */
+  public detachSocket(socketId: string): Participant | undefined {
+    const userId = this.socketToUser.get(socketId);
+    if (!userId) return undefined;
+    this.socketToUser.delete(socketId);
+    const participant = this.participants.get(userId);
+    if (participant && participant.socketId === socketId) participant.socketId = '';
     return participant;
   }
 
@@ -208,13 +222,17 @@ export class Room {
   }
 
   public toData(): RoomData {
+    const now = Date.now();
     return {
       roomId: this.roomId,
       roomName: this.roomName,
       hostId: this.hostId,
       playbackState: {
         ...this.playbackState,
-        currentTime: this.getEffectiveCurrentTime()
+        // This is a snapshot.  Pair the effective time with the snapshot time so
+        // joining clients do not add the elapsed time twice.
+        currentTime: this.getEffectiveCurrentTime(),
+        updatedAt: now
       },
       participants: Array.from(this.participants.values()),
       pendingRequests: Array.from(this.permissionRequests.values()),
@@ -284,6 +302,15 @@ export class RoomManager {
       }, 1000 * 60 * 30); // 30-minute persistence for empty room
     }
     return { room, participant };
+  }
+
+  public detachSocket(socketId: string): { room?: Room; participant?: Participant } {
+    const roomId = this.socketToRoom.get(socketId);
+    if (!roomId) return {};
+    this.socketToRoom.delete(socketId);
+    const room = this.rooms.get(roomId);
+    if (!room) return {};
+    return { room, participant: room.detachSocket(socketId) };
   }
 
   public getSessionBySocketId(socketId: string): { room: Room; participant: Participant } | undefined {

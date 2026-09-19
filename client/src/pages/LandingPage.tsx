@@ -79,35 +79,35 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
           </div>
 
-          {/* Quick Live Stats Banner */}
+          {/* Product Capability Banner */}
           <div className="mt-10 w-full max-w-3xl grid grid-cols-1 sm:grid-cols-3 gap-2 p-1.5 rounded-2xl bg-surface-container-low shadow-sm border border-surface-container-high/60">
             <div className="flex flex-col items-center py-2 px-4 rounded-xl bg-surface-container/60">
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold text-on-surface">1,420+</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-tertiary" />
+                <span className="text-lg font-bold text-on-surface">Create</span>
+                <span className="material-symbols-outlined text-primary text-[16px]">add_circle</span>
               </div>
               <span className="text-[11px] text-on-surface-variant uppercase tracking-wider font-medium mt-0.5">
-                Active Watch Parties
+                Start a Room
               </span>
             </div>
 
             <div className="flex flex-col items-center py-2 px-4 rounded-xl bg-surface-container/60">
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold text-tertiary">Instant</span>
-                <span className="material-symbols-outlined text-tertiary text-[16px]">bolt</span>
+                <span className="text-lg font-bold text-tertiary">Share</span>
+                <span className="material-symbols-outlined text-tertiary text-[16px]">link</span>
               </div>
               <span className="text-[11px] text-on-surface-variant uppercase tracking-wider font-medium mt-0.5">
-                Playback Sync
+                Invite Friends
               </span>
             </div>
 
             <div className="flex flex-col items-center py-2 px-4 rounded-xl bg-surface-container/60">
               <div className="flex items-center gap-1.5">
-                <span className="text-lg font-bold text-secondary">100% Free</span>
-                <span className="material-symbols-outlined text-secondary text-[16px]">verified</span>
+                <span className="text-lg font-bold text-secondary">Watch</span>
+                <span className="material-symbols-outlined text-secondary text-[16px]">play_circle</span>
               </div>
               <span className="text-[11px] text-on-surface-variant uppercase tracking-wider font-medium mt-0.5">
-                No Signup Required
+                Together
               </span>
             </div>
           </div>
@@ -122,10 +122,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span className="w-3 h-3 rounded-full bg-surface-variant" />
                   <span className="w-3 h-3 rounded-full bg-surface-variant" />
                   <span className="ml-2 text-xs sm:text-sm text-on-surface font-medium truncate">
-                    Interstellar - 4K Space Sequence Sync
+                    WatchTogether Live Preview
                   </span>
                   <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-mono text-xs">
-                    #WT-8942
+                    PRODUCT PREVIEW
                   </span>
                 </div>
 
@@ -134,7 +134,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-container/30 text-tertiary shadow-sm">
                     <span className="material-symbols-outlined text-[14px]">check</span>
                     <span className="text-[11px] uppercase font-bold tracking-wider">
-                      All participants synced
+                      Synchronized YouTube Playback
                     </span>
                   </div>
                 </div>
@@ -162,12 +162,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-white text-[20px] fill">pause</span>
                         <span className="material-symbols-outlined text-on-surface-variant text-[20px]">volume_up</span>
-                        <span className="text-on-surface font-medium">01:42:18</span>
-                        <span>/</span>
-                        <span>02:49:00</span>
+                        <span className="text-on-surface font-medium">Playback controls</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="px-1.5 py-0.5 rounded bg-surface-container text-tertiary text-[11px]">1080p60</span>
+                        <span className="px-1.5 py-0.5 rounded bg-surface-container text-tertiary text-[11px]">Preview</span>
                         <span className="material-symbols-outlined text-on-surface-variant text-[20px]">fullscreen</span>
                       </div>
                     </div>
@@ -178,30 +176,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               {/* Bottom Participant Shelf */}
               <div className="h-14 bg-surface-container-low px-4 sm:px-6 flex items-center justify-between">
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xs text-on-surface-variant uppercase tracking-wider hidden sm:inline">
-                    Watching now:
+                  <span className="text-xs text-on-surface-variant uppercase tracking-wider">
+                    A polished preview of shared playback
                   </span>
-                  <div className="flex items-center -space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-300 ring-2 ring-surface-container-low flex items-center justify-center font-bold text-xs" title="Dhruv (Host)">
-                      D
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-300 ring-2 ring-surface-container-low flex items-center justify-center font-bold text-xs" title="Rahul (Moderator)">
-                      R
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-300 ring-2 ring-surface-container-low flex items-center justify-center font-bold text-xs" title="Aman">
-                      A
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 ring-2 ring-surface-container-low flex items-center justify-center font-bold text-xs" title="Priya">
-                      P
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-surface-container-high text-on-surface text-[11px] font-bold ring-2 ring-surface-container-low flex items-center justify-center">
-                      +14
-                    </div>
-                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" />
-                  <span className="font-mono text-xs text-tertiary font-semibold">Live Room</span>
+                  <span className="font-mono text-xs text-tertiary font-semibold">All Participants Synced</span>
                 </div>
               </div>
             </div>
@@ -235,14 +216,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
                 <h3 className="text-lg font-semibold text-on-surface mb-2">Synchronized Playback</h3>
                 <p className="text-sm text-on-surface-variant leading-relaxed">
-                  Everyone stays in sync when the video plays, pauses, or seeks. Built with real-time WebSockets for sub-second precision and instant drift compensation.
+                  Everyone stays aligned when the video plays, pauses, or seeks, with the room state shared in real time.
                 </p>
               </div>
               {/* Feature Micro Visualization */}
               <div className="mt-6 pt-4 bg-surface-container-low p-4 rounded-xl border border-surface-container-high/40">
                 <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant mb-2">
                   <span className="text-tertiary flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary" /> In Sync with Host
+                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary" /> Shared room state
                   </span>
                   <span className="text-outline/70">Automatic Drift Fix</span>
                 </div>
@@ -269,7 +250,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="mt-6 pt-4 bg-surface-container-low p-4 rounded-xl flex items-center justify-between border border-surface-container-high/40">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-secondary text-[18px]">key</span>
-                  <span className="font-mono text-sm text-on-surface font-bold tracking-widest">#AB-12CD</span>
+                  <span className="font-mono text-sm text-on-surface font-bold">Shareable invite</span>
                 </div>
                 <span className="text-xs text-secondary bg-secondary-container/30 px-2 py-0.5 rounded">
                   Instant Join
@@ -308,7 +289,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* HOW IT WORKS SECTION */}
-      <section id="how-it-works" className="w-full px-4 md:px-8 py-16 lg:py-24 bg-surface-container-lowest relative overflow-hidden">
+      <section id="how-it-works" className="scroll-mt-20 w-full px-4 md:px-8 py-16 lg:py-24 bg-surface-container-lowest relative overflow-hidden">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
@@ -341,7 +322,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </p>
               <div className="mt-auto p-3 rounded-xl bg-surface-container flex items-center gap-2 text-on-surface-variant font-mono text-xs truncate">
                 <span className="text-primary material-symbols-outlined text-[16px]">link</span>
-                <span className="truncate">youtube.com/watch?v=dQw4w9WgXcQ</span>
+                <span className="truncate">youtube.com/watch?v=your-video</span>
               </div>
             </div>
 
@@ -358,7 +339,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Send your unique 6-character room code or your instant invite link to friends across any chat app.
               </p>
               <div className="mt-auto p-3 rounded-xl bg-surface-container flex items-center justify-between text-on-surface font-mono text-xs">
-                <span className="tracking-widest font-bold text-secondary">wt.party/AB12CD</span>
+                <span className="font-bold text-secondary">Your room link</span>
                 <span className="material-symbols-outlined text-on-surface-variant text-[16px]">content_copy</span>
               </div>
             </div>
@@ -377,9 +358,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </p>
               <div className="mt-auto p-3 rounded-xl bg-surface-container flex items-center justify-between text-tertiary font-mono text-xs">
                 <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" /> Synchronized Live
+                  <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" /> Shared playback
                 </span>
-                <span className="text-on-surface-variant">Zero Lag</span>
+                <span className="text-on-surface-variant">Ready to watch together</span>
               </div>
             </div>
           </div>

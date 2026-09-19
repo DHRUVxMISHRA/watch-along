@@ -6,6 +6,7 @@ import {
   canAssignRole
 } from '../models/RoomManager';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
+import { extractYouTubeVideoId } from '../utils/youtube';
 
 export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToClientEvents>) {
   io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
@@ -135,7 +136,13 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
         return;
       }
 
-      const cleanVideoId = videoId.trim();
+      // Room creation and live changes must persist the identical canonical
+      // video ID, never a URL or URL fragment.
+      const cleanVideoId = extractYouTubeVideoId(videoId);
+      if (!cleanVideoId) {
+        if (callback) callback({ success: false, error: 'Invalid YouTube video ID provided.' });
+        return;
+      }
       const updatedState = room.changeVideo(cleanVideoId, title, duration);
       io.to(`room:${room.roomId}`).emit('sync_state', updatedState);
       if (callback) callback({ success: true });
@@ -280,7 +287,12 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
           const updated = room.seek(request.payload.time);
           io.to(`room:${room.roomId}`).emit('sync_state', updated);
         } else if (request.action === 'change_video' && request.payload && request.payload.videoId) {
-          const updated = room.changeVideo(request.payload.videoId, request.payload.title, request.payload.duration);
+          const videoId = extractYouTubeVideoId(request.payload.videoId);
+          if (!videoId) {
+            if (callback) callback({ success: false, error: 'Invalid YouTube video ID provided.' });
+            return;
+          }
+          const updated = room.changeVideo(videoId, request.payload.title, request.payload.duration);
           io.to(`room:${room.roomId}`).emit('sync_state', updated);
         }
       }
@@ -321,15 +333,27 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
 
     // DISCONNECT
     socket.on('disconnect', () => {
-      const { room, participant } = roomManager.unregisterSocket(socket.id);
-      if (room && participant) {
+      // Socket.IO assigns a new socket.id after a refresh/reconnect.  Keep the
+      // stable participant briefly so the same userId can reclaim its role.
+      const { room, participant } = roomManager.detachSocket(socket.id);
+      if (!room || !participant) return;
+
+      const disconnectedUserId = participant.userId;
+      setTimeout(() => {
+        const current = room.getParticipantByUserId(disconnectedUserId);
+        // A rejoin replaces socketId, so only remove a participant that really
+        // remained disconnected for the full grace period.
+        if (!current || current.socketId) return;
+
+        const removed = room.removeParticipantByUserId(disconnectedUserId);
+        if (!removed) return;
         const roomData = room.toData();
         io.to(`room:${room.roomId}`).emit('user_left', {
-          username: participant.username,
-          userId: participant.userId,
+          username: removed.username,
+          userId: removed.userId,
           participants: roomData.participants
         });
-      }
+      }, 10_000);
     });
   });
 }

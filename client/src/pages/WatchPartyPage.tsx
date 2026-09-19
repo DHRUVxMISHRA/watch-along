@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Participant, Role, PlaybackState, PermissionRequest, ToastMessage } from '../types';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer';
-import { formatTime, extractYouTubeVideoId } from '../utils/youtube';
+import { formatTime } from '../utils/youtube';
 import { socket } from '../services/socket';
 
 interface WatchPartyPageProps {
@@ -41,6 +42,8 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
 
   // Three-dot menu toggle for Host participant management
   const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null);
+  const latestPlaybackVersion = useRef(initialPlayback.version || 0);
 
   // Modals
   const [showPermissionModal, setShowPermissionModal] = useState(false);
@@ -71,9 +74,16 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
   const canControl = currentUserRole === 'HOST' || currentUserRole === 'MODERATOR';
   const isHost = currentUserRole === 'HOST';
 
+  // The parent replaces room snapshots after the initial join and reconnect.
+  // Keep the displayed room state aligned with that authoritative snapshot.
+  useEffect(() => {
+    setParticipants(initialParticipants);
+    setCurrentUserRole(initialRole);
+    setActiveRequests(initialPendingRequests || []);
+  }, [initialParticipants, initialPendingRequests, initialRole]);
+
   // YouTube Player hook
   const {
-    isReady,
     currentVideoId,
     playerState,
     duration,
@@ -86,7 +96,6 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
     setVolume
   } = useYouTubePlayer({
     elementId: 'youtube-player-frame',
-    initialVideoId: initialPlayback.videoId || 'zSWdZVtXT7E',
     onLocalPlay: () => {
       if (canControl) {
         socket.emit('play', {}, (res) => {
@@ -118,20 +127,29 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
 
   // Initialize playback state from server
   useEffect(() => {
-    if (isReady && initialPlayback) {
+    if (initialPlayback) {
+      latestPlaybackVersion.current = Math.max(latestPlaybackVersion.current, initialPlayback.version);
+      const effectiveTime = initialPlayback.isPlaying
+        ? initialPlayback.currentTime + Math.max(0, (Date.now() - initialPlayback.updatedAt) / 1000)
+        : initialPlayback.currentTime;
       applyRemoteSync(
         initialPlayback.videoId,
         initialPlayback.isPlaying,
-        initialPlayback.currentTime
+        effectiveTime
       );
     }
-  }, [isReady]);
+  }, [initialPlayback, applyRemoteSync]);
 
   // Socket.IO real-time event listeners
   useEffect(() => {
     // Sync state
     const handleSyncState = (state: PlaybackState) => {
-      applyRemoteSync(state.videoId, state.isPlaying, state.currentTime);
+      if (state.version < latestPlaybackVersion.current) return;
+      latestPlaybackVersion.current = state.version;
+      const effectiveTime = state.isPlaying
+        ? state.currentTime + Math.max(0, (Date.now() - state.updatedAt) / 1000)
+        : state.currentTime;
+      applyRemoteSync(state.videoId, state.isPlaying, effectiveTime);
     };
 
     // User joined
@@ -253,14 +271,8 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
     e.preventDefault();
     if (!changeVideoInput.trim()) return;
 
-    const extractedId = extractYouTubeVideoId(changeVideoInput);
-    if (!extractedId) {
-      onShowToast('Invalid Video URL', 'Please enter a valid YouTube video link or ID.', 'error');
-      return;
-    }
-
     setIsChangingVideo(true);
-    socket.emit('change_video', { videoId: extractedId }, (res) => {
+    socket.emit('change_video', { videoId: changeVideoInput.trim() }, (res) => {
       setIsChangingVideo(false);
       if (res.success) {
         onShowToast('Video Changed', 'Room media updated successfully', 'success');
@@ -281,12 +293,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
         onShowToast('URL Required', 'Please enter the YouTube URL you wish to play.', 'error');
         return;
       }
-      const extractedId = extractYouTubeVideoId(proposedVideoUrl);
-      if (!extractedId) {
-        onShowToast('Invalid URL', 'Please enter a valid YouTube video link.', 'error');
-        return;
-      }
-      payload = { videoId: extractedId };
+      payload = { videoId: proposedVideoUrl.trim() };
     }
 
     socket.emit('permission_request', { action: requestedAction, payload }, (res) => {
@@ -319,10 +326,8 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
     }
     if (playerState === 1) {
       localPause();
-      socket.emit('pause', {});
     } else {
       localPlay();
-      socket.emit('play', {});
     }
   };
 
@@ -333,7 +338,6 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
     }
     const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
     localSeek(newTime);
-    socket.emit('seek', { time: newTime });
   };
 
   const handleScrubberClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -347,7 +351,6 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
     const fraction = Math.max(0, Math.min(1, clickX / rect.width));
     const targetTime = fraction * duration;
     localSeek(targetTime);
-    socket.emit('seek', { time: targetTime });
   };
 
   const handleVolumeChange = (newVol: number) => {
@@ -476,9 +479,10 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
           <div className="relative w-full rounded-2xl overflow-hidden bg-surface-container-lowest shadow-2xl group flex flex-col border border-surface-container-high/60">
             {/* Master Cinematic 16:9 Video Canvas */}
             <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
-              {/* If no video is selected */}
-              {!currentVideoId ? (
-                <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-surface-container-lowest z-10">
+              {/* Keep the iframe mount available before authoritative room sync arrives. */}
+              <div id="youtube-player-frame" className="w-full h-full pointer-events-none" />
+              {!currentVideoId && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 bg-surface-container-lowest z-10">
                   <div className="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4 border border-surface-container-highest shadow-inner">
                     <span className="material-symbols-outlined text-4xl text-primary">smart_display</span>
                   </div>
@@ -502,9 +506,6 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                     </button>
                   )}
                 </div>
-              ) : (
-                /* YouTube Mount Element */
-                <div id="youtube-player-frame" className="w-full h-full pointer-events-none" />
               )}
 
               {/* Floating Top-Left Host / Role Banner */}
@@ -548,7 +549,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
               {/* Floating Top-Right Resolution Indicator */}
               <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/85 backdrop-blur-md text-on-surface font-mono text-xs border border-surface-container-high/60">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span>{currentVideoId ? 'SYNCED 1080p' : 'STANDBY'}</span>
+                <span>{currentVideoId ? '1080p HD' : 'STANDBY'}</span>
               </div>
 
               {/* Scrim Gradient Overlay for Bottom HUD Readability */}
@@ -719,11 +720,6 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                 </span>
                 <span>•</span>
                 <span>Duration: {formatTime(duration)}</span>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1 text-tertiary font-medium">
-                  <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                  <span>In Sync ({participants.length} viewers)</span>
-                </span>
               </div>
             </div>
 
@@ -965,7 +961,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                               {p.username}
                             </span>
                             {isSelf && (
-                              <span className="text-[11px] text-primary font-medium">(You)</span>
+                              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">You</span>
                             )}
                           </div>
 
@@ -1004,54 +1000,26 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                         )}
 
                         {/* Host controls for other users */}
-                        {isHost && !isItemHost && (
-                          <div className="relative">
+                        {isHost && !isSelf && (
+                          <div>
                             <button
                               type="button"
-                              onClick={() => setOpenMenuUserId(openMenuUserId === p.userId ? null : p.userId)}
+                              onClick={(event) => {
+                                if (openMenuUserId === p.userId) {
+                                  setOpenMenuUserId(null);
+                                  setMenuPosition(null);
+                                  return;
+                                }
+                                const rect = event.currentTarget.getBoundingClientRect();
+                                setMenuPosition({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                                setOpenMenuUserId(p.userId);
+                              }}
                               className="p-1 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-variant transition-colors cursor-pointer"
                               title="Manage Participant"
                             >
                               <span className="material-symbols-outlined text-[18px]">more_vert</span>
                             </button>
 
-                            {/* Dropdown Menu (Screenshot 3) */}
-                            {openMenuUserId === p.userId && (
-                              <div className="absolute right-0 top-full mt-1 w-48 rounded-xl bg-surface-container-highest shadow-2xl p-1 z-30 border border-surface-container-high flex flex-col gap-0.5 animate-in fade-in duration-150">
-                                {isItemMod ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAssignRole(p.userId, 'PARTICIPANT')}
-                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-bright flex items-center gap-2 text-on-surface text-xs transition-colors cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px] text-secondary">
-                                      check_indeterminate_small
-                                    </span>
-                                    <span>Remove Moderator Privileges</span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAssignRole(p.userId, 'MODERATOR')}
-                                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-bright flex items-center gap-2 text-on-surface text-xs transition-colors cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px] text-indigo-400">
-                                      shield
-                                    </span>
-                                    <span>Assign Moderator</span>
-                                  </button>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleKickParticipant(p.userId)}
-                                  className="w-full text-left px-3 py-2 rounded-lg hover:bg-error-container hover:text-on-error-container flex items-center gap-2 text-error text-xs transition-colors cursor-pointer"
-                                >
-                                  <span className="material-symbols-outlined text-[16px]">person_remove</span>
-                                  <span>Kick Participant</span>
-                                </button>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1061,13 +1029,37 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
               })}
             </div>
 
+            {openMenuUserId && menuPosition && (() => {
+              const target = participants.find((participant) => participant.userId === openMenuUserId);
+              if (!target || target.userId === userId || !isHost) return null;
+              return createPortal(
+                <div
+                  className="fixed w-48 rounded-xl bg-surface-container-highest shadow-2xl p-1 z-[100] border border-surface-container-high flex flex-col gap-0.5 animate-in fade-in duration-150"
+                  style={{ top: menuPosition.top, right: menuPosition.right }}
+                >
+                  {target.role === 'MODERATOR' ? (
+                    <button type="button" onClick={() => handleAssignRole(target.userId, 'PARTICIPANT')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-bright flex items-center gap-2 text-on-surface text-xs transition-colors cursor-pointer">
+                      <span className="material-symbols-outlined text-[16px] text-secondary">check_indeterminate_small</span><span>Remove Moderator</span>
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => handleAssignRole(target.userId, 'MODERATOR')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-bright flex items-center gap-2 text-on-surface text-xs transition-colors cursor-pointer">
+                      <span className="material-symbols-outlined text-[16px] text-indigo-400">shield</span><span>Assign Moderator</span>
+                    </button>
+                  )}
+                  <button type="button" onClick={() => handleKickParticipant(target.userId)} className="w-full text-left px-3 py-2 rounded-lg hover:bg-error-container hover:text-on-error-container flex items-center gap-2 text-error text-xs transition-colors cursor-pointer">
+                    <span className="material-symbols-outlined text-[16px]">person_remove</span><span>Remove Participant</span>
+                  </button>
+                </div>,
+                document.body
+              );
+            })()}
+
             {/* Bottom Panel Status */}
             <div className="pt-2 border-t border-surface-container-high/40 flex items-center justify-between text-on-surface-variant text-xs">
               <div className="flex items-center gap-1.5 text-tertiary">
                 <span className="material-symbols-outlined text-[16px]">check_circle</span>
                 <span className="text-on-surface-variant">Playback controlled by Host/Mod</span>
               </div>
-              <span className="text-tertiary font-medium">All Synced</span>
             </div>
           </div>
         </div>
