@@ -5,11 +5,8 @@ interface NavbarProps {
   currentPath?: 'home' | 'create-join' | 'room' | 'how-it-works';
   onNavigate: (path: 'home' | 'create-join' | 'how-it-works') => void;
   roomInfo?: {
-    roomId: string;
-    roomName: string;
     username: string;
     role: Role;
-    onCopyCode?: () => void;
     onLeaveRoom?: () => void;
   };
 }
@@ -99,51 +96,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
         </div>
 
-        {/* Right Section: Room Stats / User Info or CTA */}
+        {/* Right Section: global user context / CTA */}
         {roomInfo ? (
           <div className="flex items-center gap-3">
-            {/* Live Room Meta (hidden on extra small screens) */}
-            <div className="hidden md:flex items-center gap-2.5 px-3 py-1 bg-surface-container-low rounded-full border border-surface-container-high/60">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" />
-                <span className="text-xs uppercase font-semibold text-tertiary tracking-wide">
-                  Live
-                </span>
-                <span className="text-xs text-on-surface font-medium ml-1 truncate max-w-[120px]">
-                  {roomInfo.roomName}
-                </span>
-              </div>
-
-              {/* Room Code Badge */}
-              <div className="flex items-center gap-1.5 bg-surface-container px-2 py-0.5 rounded-md">
-                <span className="font-mono text-xs text-on-surface-variant tracking-wider">
-                  #{roomInfo.roomId}
-                </span>
-                {roomInfo.onCopyCode && (
-                  <button
-                    onClick={roomInfo.onCopyCode}
-                    className="text-on-surface-variant hover:text-on-surface transition-colors"
-                    title="Copy Room Code"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[14px]">content_copy</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Leave Room Pill */}
-              {roomInfo.onLeaveRoom && (
-                <button
-                  onClick={roomInfo.onLeaveRoom}
-                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-error-container/80 text-on-error-container hover:bg-error hover:text-on-error text-xs font-medium transition-colors cursor-pointer"
-                  type="button"
-                >
-                  <span className="material-symbols-outlined text-[13px]">logout</span>
-                  <span>Leave</span>
-                </button>
-              )}
-            </div>
-
             {/* Profile Avatar & Role */}
             <div className="flex items-center gap-2.5 pl-1">
               <div className="hidden sm:flex flex-col text-right">
@@ -163,6 +118,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {roomInfo.username.charAt(0).toUpperCase() || 'U'}
               </div>
             </div>
+            {roomInfo.onLeaveRoom && (
+              <button onClick={roomInfo.onLeaveRoom} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-error-container/80 text-on-error-container hover:bg-error hover:text-on-error text-xs font-medium transition-colors cursor-pointer" type="button">
+                <span className="material-symbols-outlined text-[14px]">logout</span><span>Leave Room</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-3">

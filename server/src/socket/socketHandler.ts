@@ -321,15 +321,27 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
 
     // DISCONNECT
     socket.on('disconnect', () => {
-      const { room, participant } = roomManager.unregisterSocket(socket.id);
-      if (room && participant) {
+      // Socket.IO assigns a new socket.id after a refresh/reconnect.  Keep the
+      // stable participant briefly so the same userId can reclaim its role.
+      const { room, participant } = roomManager.detachSocket(socket.id);
+      if (!room || !participant) return;
+
+      const disconnectedUserId = participant.userId;
+      setTimeout(() => {
+        const current = room.getParticipantByUserId(disconnectedUserId);
+        // A rejoin replaces socketId, so only remove a participant that really
+        // remained disconnected for the full grace period.
+        if (!current || current.socketId) return;
+
+        const removed = room.removeParticipantByUserId(disconnectedUserId);
+        if (!removed) return;
         const roomData = room.toData();
         io.to(`room:${room.roomId}`).emit('user_left', {
-          username: participant.username,
-          userId: participant.userId,
+          username: removed.username,
+          userId: removed.userId,
           participants: roomData.participants
         });
-      }
+      }, 10_000);
     });
   });
 }

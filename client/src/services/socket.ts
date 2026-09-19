@@ -21,13 +21,3 @@ export function getOrCreateUserId(): string {
   }
   return userId;
 }
-
-export function getSavedUsername(): string {
-  return localStorage.getItem('wt_username') || '';
-}
-
-export function saveUsername(name: string): void {
-  if (name && name.trim()) {
-    localStorage.setItem('wt_username', name.trim());
-  }
-}

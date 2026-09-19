@@ -5,7 +5,8 @@ import { LandingPage } from './pages/LandingPage';
 import { CreateJoinPage } from './pages/CreateJoinPage';
 import { WatchPartyPage } from './pages/WatchPartyPage';
 import { ToastMessage, RoomData, Role } from './types';
-import { socket, getOrCreateUserId, getSavedUsername, saveUsername } from './services/socket';
+import { socket, getOrCreateUserId } from './services/socket';
+import { extractYouTubeVideoId } from './utils/youtube';
 
 export const App: React.FC = () => {
   // Navigation state
@@ -18,7 +19,9 @@ export const App: React.FC = () => {
   activeRoomRef.current = activeRoom;
 
   const [currentUserRole, setCurrentUserRole] = useState<Role>('PARTICIPANT');
-  const [username, setUsername] = useState<string>(getSavedUsername() || '');
+  // A display name is entered for the current room; do not prefill it from a
+  // previous room's local storage value.
+  const [username, setUsername] = useState<string>('');
   const [userId] = useState<string>(getOrCreateUserId());
 
   // Connection state
@@ -63,20 +66,8 @@ export const App: React.FC = () => {
           const res = await fetch(`/api/rooms/${code}`);
           const data = await res.json();
           if (data.success && data.room) {
-            const savedName = getSavedUsername();
-            if (savedName) {
-              socket.emit('join_room', { roomId: code, username: savedName, userId }, (joinRes) => {
-                if (joinRes.success && joinRes.room) {
-                  setActiveRoom(joinRes.room);
-                  setCurrentUserRole(joinRes.userRole || 'PARTICIPANT');
-                  setCurrentPath('room');
-                } else {
-                  setUrlRoomCode(code);
-                  setCurrentPath('create-join');
-                }
-              });
-              return;
-            }
+            // A fresh page load must ask for a name instead of silently
+            // impersonating the previous browser user's display name.
           }
         } catch {
           // Ignore network err on initial check
@@ -108,7 +99,7 @@ export const App: React.FC = () => {
       if (activeRoomRef.current) {
         socket.emit(
           'join_room',
-          { roomId: activeRoomRef.current.roomId, username: username || 'User', userId },
+          { roomId: activeRoomRef.current.roomId, username, userId },
           (res) => {
             if (res.success && res.room) {
               setActiveRoom(res.room);
@@ -146,9 +137,11 @@ export const App: React.FC = () => {
 
   // Create Room handler - Real End-to-End Flow
   const handleCreateRoom = async (roomName: string, videoUrl: string, hostDisplayName?: string) => {
-    const finalHostName = (hostDisplayName && hostDisplayName.trim()) || username || 'Host';
+    const finalHostName = hostDisplayName?.trim();
+    if (!finalHostName) {
+      throw new Error('Please enter your display name before creating a room.');
+    }
     setUsername(finalHostName);
-    saveUsername(finalHostName);
 
     try {
       const res = await fetch('/api/rooms', {
@@ -156,7 +149,8 @@ export const App: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomName: roomName || 'Watch Party',
-          videoUrl: videoUrl || undefined,
+          // Create and change-video both send a canonical YouTube video ID.
+          videoUrl: videoUrl ? extractYouTubeVideoId(videoUrl) || undefined : undefined,
           userId,
           username: finalHostName
         })
@@ -196,9 +190,11 @@ export const App: React.FC = () => {
 
   // Join Room handler
   const handleJoinRoom = async (roomId: string, inputUsername: string) => {
-    const cleanName = inputUsername.trim() || 'Guest';
+    const cleanName = inputUsername.trim();
+    if (!cleanName) {
+      return Promise.reject(new Error('Please enter your display name to join.'));
+    }
     setUsername(cleanName);
-    saveUsername(cleanName);
 
     return new Promise<void>((resolve, reject) => {
       socket.emit('join_room', { roomId, username: cleanName, userId }, (res) => {
@@ -244,14 +240,8 @@ export const App: React.FC = () => {
         roomInfo={
           activeRoom
             ? {
-                roomId: activeRoom.roomId,
-                roomName: activeRoom.roomName,
                 username,
                 role: currentUserRole,
-                onCopyCode: () => {
-                  navigator.clipboard.writeText(activeRoom.roomId).catch(() => {});
-                  showToast('Room Code Copied!', `Code ${activeRoom.roomId} copied to clipboard`, 'success');
-                },
                 onLeaveRoom: handleLeaveRoom
               }
             : undefined

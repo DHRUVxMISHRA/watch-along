@@ -68,6 +68,11 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!hostName.trim()) {
+      onShowToast('Name Required', 'Please enter your display name before creating a room.', 'error');
+      return;
+    }
+
     // Validate YouTube URL only if supplied
     if (videoUrl.trim()) {
       const extracted = extractYouTubeVideoId(videoUrl);
@@ -217,7 +222,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
                     <input
                       id="host-name-input"
                       className="w-full bg-surface-container-highest text-on-surface placeholder:text-on-surface-variant/50 pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-container transition-all border border-surface-container-high"
-                      placeholder="e.g. Dhruv (or leave as Host)"
+                      placeholder="Enter your name"
                       type="text"
                       value={hostName}
                       onChange={(e) => setHostName(e.target.value)}
@@ -362,7 +367,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
                     <input
                       id="nickname-input"
                       className="w-full bg-surface-container-highest text-on-surface placeholder:text-on-surface-variant/50 pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary transition-all border border-surface-container-high"
-                      placeholder="e.g. Alex"
+                      placeholder="Enter your name"
                       type="text"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
