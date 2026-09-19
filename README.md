@@ -14,20 +14,20 @@
 ---
 
 ## 📖 Table of Contents
-1. [Project Overview](#project-overview)
-2. [Core Features](#core-features)
-3. [Tech Stack](#tech-stack)
-4. [Architecture Overview](#architecture-overview)
-5. [Folder Structure](#folder-structure)
-6. [WebSockets & Event Contracts](#websockets--event-contracts)
-7. [Playback Synchronization Engine](#playback-synchronization-engine)
-8. [Role-Based Access Control (RBAC)](#role-based-access-control-rbac)
-9. [Permission Request Workflow](#permission-request-workflow)
-10. [Local Setup & Installation](#local-setup--installation)
-11. [Running Tests](#running-tests)
-12. [Production Build & Deployment Guide](#production-build--deployment-guide)
-13. [Code Walkthrough & Interview Defense](#code-walkthrough--interview-defense)
-14. [Platform Limitations & Trade-offs](#platform-limitations--trade-offs)
+1. [Project Overview](#1-project-overview)
+2. [Core Features](#2-core-features)
+3. [Tech Stack](#3-tech-stack)
+4. [Architecture Overview](#4-architecture-overview)
+5. [Folder Structure](#5-folder-structure)
+6. [WebSockets & Event Contracts](#6-websockets--event-contracts)
+7. [Playback Synchronization Engine](#7-playback-synchronization-engine)
+8. [Role-Based Access Control (RBAC)](#8-role-based-access-control-rbac)
+9. [Permission Request Workflow](#9-permission-request-workflow)
+10. [Local Setup & Installation](#10-local-setup--installation)
+11. [Running Tests](#11-running-tests)
+12. [Production Build & Deployment Guide](#12-production-build--deployment-guide)
+13. [Code Walkthrough & Interview Defense](#13-code-walkthrough--interview-defense)
+14. [Platform Limitations & Trade-offs](#14-platform-limitations--trade-offs)
 
 ---
 
