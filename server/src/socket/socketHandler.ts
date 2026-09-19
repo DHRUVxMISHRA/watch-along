@@ -6,6 +6,7 @@ import {
   canAssignRole
 } from '../models/RoomManager';
 import { ClientToServerEvents, ServerToClientEvents } from '../types';
+import { extractYouTubeVideoId } from '../utils/youtube';
 
 export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToClientEvents>) {
   io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
@@ -135,7 +136,13 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
         return;
       }
 
-      const cleanVideoId = videoId.trim();
+      // Room creation and live changes must persist the identical canonical
+      // video ID, never a URL or URL fragment.
+      const cleanVideoId = extractYouTubeVideoId(videoId);
+      if (!cleanVideoId) {
+        if (callback) callback({ success: false, error: 'Invalid YouTube video ID provided.' });
+        return;
+      }
       const updatedState = room.changeVideo(cleanVideoId, title, duration);
       io.to(`room:${room.roomId}`).emit('sync_state', updatedState);
       if (callback) callback({ success: true });

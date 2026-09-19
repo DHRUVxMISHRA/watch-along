@@ -5,6 +5,27 @@ declare global { interface Window { YT: any; onYouTubeIframeAPIReady: (() => voi
 interface UseYouTubePlayerProps { elementId: string; onLocalPlay?: () => void; onLocalPause?: () => void; onLocalSeek?: (time: number) => void; }
 interface RemoteState { videoId: string; isPlaying: boolean; time: number; }
 
+let youtubeApiPromise: Promise<void> | null = null;
+
+function loadYouTubeApi(): Promise<void> {
+  if (window.YT?.Player) return Promise.resolve();
+  if (youtubeApiPromise) return youtubeApiPromise;
+
+  youtubeApiPromise = new Promise((resolve) => {
+    const script = document.getElementById('youtube-iframe-api') || Object.assign(document.createElement('script'), {
+      id: 'youtube-iframe-api',
+      src: 'https://www.youtube.com/iframe_api'
+    });
+    const previous = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previous?.();
+      resolve();
+    };
+    if (!script.parentNode) document.head.appendChild(script);
+  });
+  return youtubeApiPromise;
+}
+
 export function useYouTubePlayer({ elementId, onLocalPlay, onLocalPause, onLocalSeek }: UseYouTubePlayerProps) {
   const playerRef = useRef<any>(null);
   const [isReady, setIsReady] = useState(false);
@@ -41,11 +62,15 @@ export function useYouTubePlayer({ elementId, onLocalPlay, onLocalPause, onLocal
   }, [elementId]);
 
   useEffect(() => {
-    if (window.YT?.Player) { instantiatePlayer(); return; }
-    const script = document.getElementById('youtube-iframe-api') || Object.assign(document.createElement('script'), { id: 'youtube-iframe-api', src: 'https://www.youtube.com/iframe_api' });
-    if (!script.parentNode) document.head.appendChild(script);
-    const previous = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { previous?.(); instantiatePlayer(); };
+    let disposed = false;
+    loadYouTubeApi().then(() => {
+      if (!disposed) instantiatePlayer();
+    });
+    return () => {
+      disposed = true;
+      try { playerRef.current?.destroy?.(); } catch { /* iframe may already be detached */ }
+      playerRef.current = null;
+    };
   }, [instantiatePlayer]);
 
   const applyRemoteSync = useCallback((videoId: string, isPlaying: boolean, time: number) => {
