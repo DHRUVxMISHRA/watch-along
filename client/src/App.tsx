@@ -45,6 +45,12 @@ export const App: React.FC = () => {
     setToast(null);
   }, []);
 
+  const scrollToHowItWorks = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
   // Sync with browser URL /room/:code
   useEffect(() => {
     const handleLocation = async () => {
@@ -77,16 +83,16 @@ export const App: React.FC = () => {
       } else if (path === '/create-join') {
         setCurrentPath('create-join');
       } else {
-        if (!activeRoomRef.current) {
-          setCurrentPath('home');
-        }
+        const isHowItWorks = window.location.hash === '#how-it-works';
+        setCurrentPath(isHowItWorks ? 'how-it-works' : 'home');
+        if (isHowItWorks) scrollToHowItWorks();
       }
     };
 
     handleLocation();
     window.addEventListener('popstate', handleLocation);
     return () => window.removeEventListener('popstate', handleLocation);
-  }, [userId]);
+  }, [scrollToHowItWorks, userId]);
 
   // Socket connection monitor
   useEffect(() => {
@@ -129,8 +135,12 @@ export const App: React.FC = () => {
     setCurrentPath(path);
     if (path === 'home') {
       window.history.pushState({}, '', '/');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (path === 'create-join') {
       window.history.pushState({}, '', '/create-join');
+    } else {
+      window.history.pushState({}, '', '/#how-it-works');
+      scrollToHowItWorks();
     }
   };
 
@@ -250,7 +260,7 @@ export const App: React.FC = () => {
 
       {/* Main Content Areas */}
       <main className="flex-1 w-full pt-16">
-        {currentPath === 'home' && (
+        {(currentPath === 'home' || currentPath === 'how-it-works') && (
           <LandingPage
             onCreateRoomClick={() => navigateTo('create-join')}
             onJoinRoomClick={() => navigateTo('create-join')}
@@ -286,18 +296,6 @@ export const App: React.FC = () => {
           />
         )}
 
-        {currentPath === 'how-it-works' && (
-          <div className="w-full">
-            <LandingPage
-              onCreateRoomClick={() => navigateTo('create-join')}
-              onJoinRoomClick={() => navigateTo('create-join')}
-              onQuickJoin={(code) => {
-                setUrlRoomCode(code);
-                navigateTo('create-join');
-              }}
-            />
-          </div>
-        )}
       </main>
 
       {/* Global Toast */}
