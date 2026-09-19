@@ -7,7 +7,8 @@
 
 ## 🌐 Live Deployment & Demo
 
-- **Live Production URL**: `https://watchalong-website.onrender.com` *(Render / Railway deployment ready)*
+- **Live Production URL**: `https://watchtogether-i0mq.onrender.com`
+- **GitHub Repository**: `https://github.com/DHRUVxMISHRA/watch-along`
 - **Local Dev Server**: `http://localhost:5173` (Vite) / `http://localhost:3001` (Express API & Socket.IO)
 
 ---
@@ -34,13 +35,13 @@
 
 WatchTogether enables multiple users across different browsers and devices to join a virtual watch room and experience synchronized YouTube video playback in real time.
 
-When the **Host** or **Moderator** presses play, pauses, seeks to a timeline timestamp, or switches to a new YouTube video, all participants in the room instantly reflect that action. Joining users automatically receive the **Participant** role (view-only), and can request approval from room leaders to control playback or propose a new video.
+When the **Host** or **Moderator** presses play, pauses, seeks to a timeline timestamp, or switches to a new YouTube video, the action is propagated to connected participants through the real-time synchronization layer. Joining users automatically receive the **Participant** role (view-only), and can request approval from room leaders to control playback or propose a new video.
 
 ---
 
 ## 2. Core Features
 
-- **Real-Time Synchronization**: Play, pause, seek, and video-switch events propagate across all connected clients via WebSockets with sub-second precision.
+- **Real-Time Synchronization**: Play, pause, seek, and video-switch events are propagated across connected clients through Socket.IO/WebSockets and applied from authoritative room state.
 - **Room-Based Architecture**:
   - Room creation with optional initial YouTube URL and custom room title.
   - Unique 6-character alphanumeric room codes (e.g. `#AB12CD`) generated server-side.
@@ -293,8 +294,8 @@ npm test
 
 ## 12. Production Build & Deployment Guide
 
-### Single-Service Hosting (Render / Railway)
-The backend is designed to serve the pre-built React frontend static assets from `client/dist` in production, eliminating cross-origin issues and simplifying deployment to a single web service!
+### Single-Service Hosting (Render)
+The backend serves the pre-built React frontend static assets from `client/dist` in production, allowing the full application to run as a single web service.
 
 1. **Build the complete project**:
    ```bash
@@ -304,15 +305,31 @@ The backend is designed to serve the pre-built React frontend static assets from
    ```bash
    npm start
    ```
-   Access `http://localhost:3001` to view the full application.
+   In local production mode, access the application from the server URL (for example, `http://localhost:3001`).
 
-### Deploying to Render:
-1. Create a new **Web Service** on Render and connect the repository.
-2. Build Command: `npm run install:all && npm run build`
-3. Start Command: `npm start`
-4. Set Environment Variables:
-   - `NODE_ENV`: `production`
-   - `PORT`: `10000` (or leave default assigned by Render)
+### Deploying to Render
+
+1. Create a new Web Service and connect the repository.
+2. Branch: `main`
+3. Root Directory: leave empty
+4. Build Command:
+   `npm run install:all && npm run build`
+5. Start Command:
+   `npm start`
+6. Health Check Path:
+   `/api/health`
+7. Set:
+   `NODE_ENV=production`
+
+Render provides the production `PORT` automatically.
+
+### Database
+
+No persistent database is used in the current MVP.
+
+Room and participant state are maintained in the server-side in-memory `RoomManager`. This keeps the single-server MVP simple and fast while avoiding unnecessary persistence complexity.
+
+**Trade-off:** active rooms are lost if the server restarts. A production-scale multi-instance version could move shared room/session state to Redis and persistent metadata to PostgreSQL or another datastore.
 
 ---
 
@@ -320,7 +337,7 @@ The backend is designed to serve the pre-built React frontend static assets from
 
 ### Key Technical Decisions:
 1. **Why In-Memory RoomManager?**
-   For a single-server real-time watch party MVP, in-memory state provides zero-latency timeline lookups and eliminates database polling overhead. It adheres strictly to the official assignment recommendation while keeping architectural complexity minimal.
+   For a single-server real-time watch party MVP, in-memory state keeps room/session lookups simple and fast and avoids unnecessary persistence complexity. Persistent database storage is intentionally deferred; see the Database section above for the trade-off and production-scale path.
 2. **Why Socket.IO instead of raw WebSockets?**
    Socket.IO provides built-in channel rooms (`socket.join('room:AB12CD')`), automatic reconnection buffering, binary serialization fallback, and request-response acknowledgments (`callbacks`), which are essential for reliable permission approval workflows.
 3. **Drift Compensation vs. Hard Seeks**:
