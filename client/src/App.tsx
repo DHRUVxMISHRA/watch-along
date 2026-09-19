@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { Toast } from './components/Toast';
 import { LandingPage } from './pages/LandingPage';
@@ -14,6 +14,9 @@ export const App: React.FC = () => {
 
   // Active room state
   const [activeRoom, setActiveRoom] = useState<RoomData | null>(null);
+  const activeRoomRef = useRef<RoomData | null>(null);
+  activeRoomRef.current = activeRoom;
+
   const [currentUserRole, setCurrentUserRole] = useState<Role>('PARTICIPANT');
   const [username, setUsername] = useState<string>(getSavedUsername() || '');
   const [userId] = useState<string>(getOrCreateUserId());
@@ -42,17 +45,49 @@ export const App: React.FC = () => {
 
   // Sync with browser URL /room/:code
   useEffect(() => {
-    const handleLocation = () => {
+    const handleLocation = async () => {
       const path = window.location.pathname;
       const roomMatch = path.match(/^\/room\/([a-zA-Z0-9_-]{4,8})$/i);
+
       if (roomMatch && roomMatch[1]) {
         const code = roomMatch[1].toUpperCase();
+
+        // If user is already active in this room, maintain the room view!
+        if (activeRoomRef.current && activeRoomRef.current.roomId === code) {
+          setCurrentPath('room');
+          return;
+        }
+
+        // Try to automatically join or verify room
+        try {
+          const res = await fetch(`/api/rooms/${code}`);
+          const data = await res.json();
+          if (data.success && data.room) {
+            const savedName = getSavedUsername();
+            if (savedName) {
+              socket.emit('join_room', { roomId: code, username: savedName, userId }, (joinRes) => {
+                if (joinRes.success && joinRes.room) {
+                  setActiveRoom(joinRes.room);
+                  setCurrentUserRole(joinRes.userRole || 'PARTICIPANT');
+                  setCurrentPath('room');
+                } else {
+                  setUrlRoomCode(code);
+                  setCurrentPath('create-join');
+                }
+              });
+              return;
+            }
+          }
+        } catch {
+          // Ignore network err on initial check
+        }
+
         setUrlRoomCode(code);
         setCurrentPath('create-join');
       } else if (path === '/create-join') {
         setCurrentPath('create-join');
       } else {
-        if (!activeRoom) {
+        if (!activeRoomRef.current) {
           setCurrentPath('home');
         }
       }
@@ -61,23 +96,26 @@ export const App: React.FC = () => {
     handleLocation();
     window.addEventListener('popstate', handleLocation);
     return () => window.removeEventListener('popstate', handleLocation);
-  }, [activeRoom]);
+  }, [userId]);
 
   // Socket connection monitor
   useEffect(() => {
     const onConnect = () => {
       setIsConnected(true);
       setIsReconnecting(false);
-      showToast('Connected', 'Real-time WebSocket connected', 'success');
 
       // If user was in an active room, rejoin gracefully
-      if (activeRoom) {
-        socket.emit('join_room', { roomId: activeRoom.roomId, username, userId }, (res) => {
-          if (res.success && res.room) {
-            setActiveRoom(res.room);
-            if (res.userRole) setCurrentUserRole(res.userRole);
+      if (activeRoomRef.current) {
+        socket.emit(
+          'join_room',
+          { roomId: activeRoomRef.current.roomId, username: username || 'User', userId },
+          (res) => {
+            if (res.success && res.room) {
+              setActiveRoom(res.room);
+              if (res.userRole) setCurrentUserRole(res.userRole);
+            }
           }
-        });
+        );
       }
     };
 
@@ -94,7 +132,7 @@ export const App: React.FC = () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };
-  }, [activeRoom, username, userId, showToast]);
+  }, [username, userId, showToast]);
 
   // Navigation helper
   const navigateTo = (path: 'home' | 'create-join' | 'how-it-works') => {
@@ -106,18 +144,24 @@ export const App: React.FC = () => {
     }
   };
 
-  // Create Room handler
-  const handleCreateRoom = async (roomName: string, videoUrl: string) => {
-    const defaultName = username || 'Host';
-    setUsername(defaultName);
-    saveUsername(defaultName);
+  // Create Room handler - Real End-to-End Flow
+  const handleCreateRoom = async (roomName: string, videoUrl: string, hostDisplayName?: string) => {
+    const finalHostName = (hostDisplayName && hostDisplayName.trim()) || username || 'Host';
+    setUsername(finalHostName);
+    saveUsername(finalHostName);
 
     try {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomName, videoUrl })
+        body: JSON.stringify({
+          roomName: roomName || 'Watch Party',
+          videoUrl: videoUrl || undefined,
+          userId,
+          username: finalHostName
+        })
       });
+
       const data = await res.json();
       if (!data.success || !data.room) {
         throw new Error(data.error || 'Failed to create room');
@@ -125,22 +169,25 @@ export const App: React.FC = () => {
 
       const createdRoom: RoomData = data.room;
 
-      // Join socket room as creator
+      // 1. Instantly navigate to the Watch Party room screen
+      setActiveRoom(createdRoom);
+      setCurrentUserRole('HOST');
+      setCurrentPath('room');
+      window.history.pushState({}, '', `/room/${createdRoom.roomId}`);
+
+      // 2. Connect socket as Host
       socket.emit(
         'join_room',
-        { roomId: createdRoom.roomId, username: defaultName, userId },
+        { roomId: createdRoom.roomId, username: finalHostName, userId },
         (joinRes) => {
           if (joinRes.success && joinRes.room) {
             setActiveRoom(joinRes.room);
             setCurrentUserRole('HOST');
-            setCurrentPath('room');
-            window.history.pushState({}, '', `/room/${createdRoom.roomId}`);
-            showToast('Room Created!', `Room #${createdRoom.roomId} created with Host privileges`, 'success');
-          } else {
-            showToast('Join Error', joinRes.error || 'Could not join created room', 'error');
           }
         }
       );
+
+      showToast('Room Created!', `Room #${createdRoom.roomId} is live. You are the Host!`, 'success');
     } catch (err: any) {
       showToast('Error Creating Room', err?.message || 'Server error', 'error');
       throw err;
@@ -149,17 +196,18 @@ export const App: React.FC = () => {
 
   // Join Room handler
   const handleJoinRoom = async (roomId: string, inputUsername: string) => {
-    setUsername(inputUsername);
-    saveUsername(inputUsername);
+    const cleanName = inputUsername.trim() || 'Guest';
+    setUsername(cleanName);
+    saveUsername(cleanName);
 
     return new Promise<void>((resolve, reject) => {
-      socket.emit('join_room', { roomId, username: inputUsername, userId }, (res) => {
+      socket.emit('join_room', { roomId, username: cleanName, userId }, (res) => {
         if (res.success && res.room) {
           setActiveRoom(res.room);
           setCurrentUserRole(res.userRole || 'PARTICIPANT');
           setCurrentPath('room');
           window.history.pushState({}, '', `/room/${res.room.roomId}`);
-          showToast('Welcome!', `Connected to "${res.room.roomName}"`, 'success');
+          showToast('Connected', `Joined "${res.room.roomName}" as ${res.userRole}`, 'success');
           resolve();
         } else {
           reject(new Error(res.error || 'Room not found or could not join'));

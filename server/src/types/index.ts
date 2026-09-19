@@ -16,7 +16,9 @@ export interface PlaybackState {
   isPlaying: boolean;
   currentTime: number;
   updatedAt: number; // UNIX timestamp in ms
+  version: number;   // monotonically increasing — used by clients to discard stale events
 }
+
 
 export interface PermissionRequest {
   requestId: string;

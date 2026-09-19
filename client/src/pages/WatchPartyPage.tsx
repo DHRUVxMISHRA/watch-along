@@ -476,8 +476,36 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
           <div className="relative w-full rounded-2xl overflow-hidden bg-surface-container-lowest shadow-2xl group flex flex-col border border-surface-container-high/60">
             {/* Master Cinematic 16:9 Video Canvas */}
             <div className="relative w-full aspect-video bg-black flex items-center justify-center overflow-hidden">
-              {/* YouTube Mount Element */}
-              <div id="youtube-player-frame" className="w-full h-full pointer-events-none" />
+              {/* If no video is selected */}
+              {!currentVideoId ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-surface-container-lowest z-10">
+                  <div className="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center text-on-surface-variant mb-4 border border-surface-container-highest shadow-inner">
+                    <span className="material-symbols-outlined text-4xl text-primary">smart_display</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-on-surface mb-1">No video selected</h3>
+                  <p className="text-sm text-on-surface-variant max-w-md mb-6 leading-relaxed">
+                    {canControl
+                      ? "Paste a YouTube URL below to start watching together in real time."
+                      : "Waiting for the Host or Moderator to select a YouTube video..."}
+                  </p>
+                  {canControl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById('change-video-input') as HTMLInputElement;
+                        input?.focus();
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-primary-container hover:bg-inverse-primary text-white font-semibold text-xs shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">add_link</span>
+                      <span>Paste a YouTube Video URL</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                /* YouTube Mount Element */
+                <div id="youtube-player-frame" className="w-full h-full pointer-events-none" />
+              )}
 
               {/* Floating Top-Left Host / Role Banner */}
               <div className="absolute top-4 left-4 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-lowest/85 backdrop-blur-md text-on-surface shadow-md border border-surface-container-high/60">
@@ -520,7 +548,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
               {/* Floating Top-Right Resolution Indicator */}
               <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-container-lowest/85 backdrop-blur-md text-on-surface font-mono text-xs border border-surface-container-high/60">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span>SYNCED 1080p</span>
+                <span>{currentVideoId ? 'SYNCED 1080p' : 'STANDBY'}</span>
               </div>
 
               {/* Scrim Gradient Overlay for Bottom HUD Readability */}
@@ -554,7 +582,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                   ref={scrubberRef}
                   onClick={handleScrubberClick}
                   className={`relative w-full group/scrubber py-1.5 ${
-                    canControl ? 'cursor-pointer' : 'opacity-60 pointer-events-none'
+                    canControl && currentVideoId ? 'cursor-pointer' : 'opacity-60 pointer-events-none'
                   }`}
                   id="timelineBar"
                 >
@@ -575,11 +603,12 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                 {/* Controls Line */}
                 <div className="flex items-center justify-between gap-4 pt-1">
                   {/* Left Hand Control Cluster */}
-                  <div className={`flex items-center gap-2 ${!canControl ? 'opacity-60 pointer-events-none' : ''}`}>
+                  <div className={`flex items-center gap-2 ${!canControl || !currentVideoId ? 'opacity-60 pointer-events-none' : ''}`}>
                     {/* Play / Pause */}
                     <button
                       onClick={handleTogglePlay}
-                      className="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container active:scale-95 transition-all shadow-md cursor-pointer"
+                      disabled={!currentVideoId}
+                      className="w-9 h-9 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container active:scale-95 transition-all shadow-md cursor-pointer disabled:opacity-40"
                       title={playerState === 1 ? 'Pause' : 'Play'}
                       type="button"
                     >
@@ -591,7 +620,8 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                     {/* Skip 10s back */}
                     <button
                       onClick={() => handleSkip(-10)}
-                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                      disabled={!currentVideoId}
+                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer disabled:opacity-40"
                       title="Rewind 10 seconds"
                       type="button"
                     >
@@ -601,7 +631,8 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                     {/* Skip 10s forward */}
                     <button
                       onClick={() => handleSkip(10)}
-                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                      disabled={!currentVideoId}
+                      className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer disabled:opacity-40"
                       title="Forward 10 seconds"
                       type="button"
                     >
@@ -756,6 +787,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
                   link
                 </span>
                 <input
+                  id="change-video-input"
                   disabled={!canControl}
                   className={`w-full pl-10 pr-4 py-2.5 rounded-lg bg-surface-container font-mono text-xs focus:outline-none focus:ring-2 focus:ring-primary-container transition-colors border border-surface-container-high ${
                     canControl

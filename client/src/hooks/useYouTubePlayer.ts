@@ -31,51 +31,24 @@ export function useYouTubePlayer({
 
   // Guards against echo/feedback loops when applying remote updates
   const isRemoteAction = useRef(false);
-  const lastEmittedTime = useRef(0);
 
-  // Load YouTube IFrame API script
-  useEffect(() => {
-    if (window.YT && window.YT.Player) {
-      initPlayer();
-      return;
-    }
-
-    // Check if script already injected
-    const existingScript = document.getElementById('youtube-iframe-api');
-    if (!existingScript) {
-      const tag = document.createElement('script');
-      tag.id = 'youtube-iframe-api';
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
-    }
-
-    const prevCallback = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      if (prevCallback) prevCallback();
-      initPlayer();
-    };
-
-    return () => {
-      // Keep script in DOM
-    };
-  }, []);
-
-  const initPlayer = useCallback(() => {
-    if (!elementId || !document.getElementById(elementId) || playerRef.current) return;
+  // Helper to instantiate player
+  const instantiatePlayer = useCallback((vidId: string, startSecs = 0, autoplay = 0) => {
+    if (!elementId || !document.getElementById(elementId) || playerRef.current || !vidId) return;
 
     try {
       playerRef.current = new window.YT.Player(elementId, {
-        videoId: initialVideoId,
+        videoId: vidId,
         playerVars: {
-          autoplay: 0,
-          controls: 0, // We render the custom Stitch UI HUD controls
+          autoplay,
+          controls: 0,
           disablekb: 0,
           enablejsapi: 1,
           fs: 0,
           modestbranding: 1,
           rel: 0,
           iv_load_policy: 3,
+          start: Math.floor(startSecs),
           origin: window.location.origin
         },
         events: {
@@ -113,7 +86,34 @@ export function useYouTubePlayer({
     } catch (e) {
       console.error('Failed to instantiate YouTube Player', e);
     }
-  }, [elementId, initialVideoId, onLocalPlay, onLocalPause]);
+  }, [elementId, onLocalPlay, onLocalPause]);
+
+  // Load YouTube IFrame API script
+  useEffect(() => {
+    if (window.YT && window.YT.Player) {
+      if (initialVideoId) {
+        instantiatePlayer(initialVideoId);
+      }
+      return;
+    }
+
+    const existingScript = document.getElementById('youtube-iframe-api');
+    if (!existingScript) {
+      const tag = document.createElement('script');
+      tag.id = 'youtube-iframe-api';
+      tag.src = 'https://www.youtube.com/iframe_api';
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+    }
+
+    const prevCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (prevCallback) prevCallback();
+      if (initialVideoId) {
+        instantiatePlayer(initialVideoId);
+      }
+    };
+  }, [initialVideoId, instantiatePlayer]);
 
   // Interval to track currentTime and progress
   useEffect(() => {
@@ -141,7 +141,19 @@ export function useYouTubePlayer({
     targetIsPlaying: boolean,
     targetTime: number
   ) => {
-    if (!playerRef.current || !isReady || typeof playerRef.current.getPlayerState !== 'function') {
+    if (!targetVideoId) {
+      setCurrentVideoId('');
+      return;
+    }
+
+    // If player has not been created yet because room started without a video
+    if (!playerRef.current) {
+      setCurrentVideoId(targetVideoId);
+      instantiatePlayer(targetVideoId, targetTime, targetIsPlaying ? 1 : 0);
+      return;
+    }
+
+    if (!isReady || typeof playerRef.current.getPlayerState !== 'function') {
       return;
     }
 
@@ -149,7 +161,7 @@ export function useYouTubePlayer({
 
     try {
       // 1. Check if video changed
-      if (targetVideoId && targetVideoId !== currentVideoId) {
+      if (targetVideoId !== currentVideoId) {
         setCurrentVideoId(targetVideoId);
         playerRef.current.loadVideoById({
           videoId: targetVideoId,
@@ -190,7 +202,7 @@ export function useYouTubePlayer({
         isRemoteAction.current = false;
       }, 700);
     }
-  }, [isReady, currentVideoId]);
+  }, [isReady, currentVideoId, instantiatePlayer]);
 
   // Local actions (callable by UI)
   const localPlay = useCallback(() => {
@@ -216,14 +228,18 @@ export function useYouTubePlayer({
   }, [isReady, onLocalSeek]);
 
   const localChangeVideo = useCallback((videoId: string) => {
-    if (!playerRef.current || !isReady) return;
-    isRemoteAction.current = false;
     setCurrentVideoId(videoId);
+    if (!playerRef.current) {
+      instantiatePlayer(videoId, 0, 0);
+      return;
+    }
+    if (!isReady) return;
+    isRemoteAction.current = false;
     playerRef.current.loadVideoById({
       videoId,
       startSeconds: 0
     });
-  }, [isReady]);
+  }, [isReady, instantiatePlayer]);
 
   const setVolume = useCallback((vol: number) => {
     if (playerRef.current && typeof playerRef.current.setVolume === 'function') {

@@ -4,7 +4,7 @@ import { extractYouTubeVideoId } from '../utils/youtube';
 interface CreateJoinPageProps {
   initialCode?: string;
   initialName?: string;
-  onCreateRoom: (roomName: string, videoUrl: string) => Promise<void>;
+  onCreateRoom: (roomName: string, videoUrl: string, hostName?: string) => Promise<void>;
   onJoinRoom: (roomId: string, username: string) => Promise<void>;
   onShowToast: (title: string, description: string, type?: 'success' | 'error' | 'info') => void;
 }
@@ -18,6 +18,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
 }) => {
   // Create Room state
   const [roomTitle, setRoomTitle] = useState('');
+  const [hostName, setHostName] = useState(initialName || '');
   const [videoUrl, setVideoUrl] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
@@ -36,10 +37,11 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
   useEffect(() => {
     if (initialName) {
       setDisplayName(initialName);
+      if (!hostName) setHostName(initialName);
     }
   }, [initialName]);
 
-  // Validate room code when 6 characters
+  // Validate room code when 6 characters typed into the Join card
   useEffect(() => {
     const clean = roomCode.trim().toUpperCase();
     if (clean.length === 6) {
@@ -51,11 +53,6 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
               roomId: data.room.roomId,
               roomName: data.room.roomName
             });
-            onShowToast(
-              `Room #${data.room.roomId} Verified`,
-              `"${data.room.roomName}" is ready • Synced stream available`,
-              'success'
-            );
           } else {
             setValidatedRoomInfo(null);
           }
@@ -66,16 +63,18 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
     } else {
       setValidatedRoomInfo(null);
     }
-  }, [roomCode, onShowToast]);
+  }, [roomCode]);
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate YouTube URL only if supplied
     if (videoUrl.trim()) {
       const extracted = extractYouTubeVideoId(videoUrl);
       if (!extracted) {
         onShowToast(
           'Invalid YouTube URL',
-          'Please provide a valid YouTube watch link or leave it blank.',
+          'Please enter a valid YouTube video URL or leave it empty.',
           'error'
         );
         return;
@@ -84,9 +83,9 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
 
     setIsCreating(true);
     try {
-      await onCreateRoom(roomTitle.trim(), videoUrl.trim());
+      await onCreateRoom(roomTitle.trim(), videoUrl.trim(), hostName.trim());
     } catch (err: any) {
-      onShowToast('Failed to create room', err?.message || 'Server error', 'error');
+      onShowToast('Failed to Create Room', err?.message || 'Server error', 'error');
     } finally {
       setIsCreating(false);
     }
@@ -111,7 +110,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
     try {
       await onJoinRoom(cleanCode, cleanName);
     } catch (err: any) {
-      onShowToast('Could not join room', err?.message || 'Room not found or server unreachable', 'error');
+      onShowToast('Could Not Join Room', err?.message || 'Room not found or server unreachable', 'error');
     } finally {
       setIsJoining(false);
     }
@@ -121,7 +120,6 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
     try {
       const text = await navigator.clipboard.readText();
       if (text) {
-        // If user pasted a full room URL like http://localhost:5173/room/AB12CD
         let extractedCode = text.trim();
         const urlMatch = text.match(/\/room\/([a-zA-Z0-9_-]{4,8})/);
         if (urlMatch && urlMatch[1]) {
@@ -131,7 +129,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
         }
         const cleaned = extractedCode.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
         setRoomCode(cleaned);
-        onShowToast('Code Pasted', `Room code ${cleaned} loaded from clipboard`, 'info');
+        onShowToast('Code Pasted', `Room code #${cleaned} loaded from clipboard`, 'info');
       }
     } catch {
       onShowToast('Clipboard Error', 'Could not read clipboard. Please paste manually.', 'error');
@@ -188,7 +186,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
                 </p>
 
                 {/* Input 1: Room Title */}
-                <div className="flex flex-col gap-1.5 mb-5">
+                <div className="flex flex-col gap-1.5 mb-4">
                   <label className="text-xs font-semibold text-on-surface" htmlFor="room-name-input">
                     Room Title
                   </label>
@@ -207,7 +205,27 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
                   </div>
                 </div>
 
-                {/* Input 2: YouTube Video URL (Optional) */}
+                {/* Input 2: Host Display Name */}
+                <div className="flex flex-col gap-1.5 mb-4">
+                  <label className="text-xs font-semibold text-on-surface" htmlFor="host-name-input">
+                    Your Host Display Name
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="material-symbols-outlined absolute left-3 text-on-surface-variant text-lg pointer-events-none">
+                      account_circle
+                    </span>
+                    <input
+                      id="host-name-input"
+                      className="w-full bg-surface-container-highest text-on-surface placeholder:text-on-surface-variant/50 pl-10 pr-4 py-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-container transition-all border border-surface-container-high"
+                      placeholder="e.g. Dhruv (or leave as Host)"
+                      type="text"
+                      value={hostName}
+                      onChange={(e) => setHostName(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {/* Input 3: YouTube Video URL (Optional) */}
                 <div className="flex flex-col gap-1.5 mb-6">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-semibold text-on-surface" htmlFor="video-url-input">
@@ -377,7 +395,7 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
           </div>
         </div>
 
-        {/* Status Preview Bar */}
+        {/* Status Preview Bar (Only shown when a valid 6-char code is typed in Join Room) */}
         {validatedRoomInfo && (
           <div className="w-full max-w-xl mx-auto mt-8 flex flex-col items-center gap-2 z-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
             <div className="w-full bg-surface-container-high/90 backdrop-blur-md rounded-xl p-4 flex items-center justify-between shadow-md border border-tertiary/20">
@@ -387,10 +405,10 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-sm font-semibold text-on-surface truncate">
-                    Room {validatedRoomInfo.roomId} is ready to join
+                    Room #{validatedRoomInfo.roomId} found
                   </span>
                   <span className="text-xs text-on-surface-variant truncate">
-                    "{validatedRoomInfo.roomName}" • Synchronized playback ready
+                    "{validatedRoomInfo.roomName}" • Ready to join
                   </span>
                 </div>
               </div>

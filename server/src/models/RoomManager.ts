@@ -21,18 +21,25 @@ export class Room {
   public permissionRequests: Map<string, PermissionRequest> = new Map(); // requestId -> PermissionRequest
   public createdAt: number;
 
-  constructor(roomId: string, roomName?: string, initialVideoId?: string, initialTitle?: string) {
+  constructor(
+    roomId: string,
+    roomName?: string,
+    initialVideoId?: string,
+    initialTitle?: string,
+    initialHostId?: string
+  ) {
     this.roomId = roomId.toUpperCase();
     this.roomName = (roomName && roomName.trim()) || 'Watch Party';
-    this.hostId = '';
+    this.hostId = initialHostId || '';
     this.createdAt = Date.now();
     this.playbackState = {
-      videoId: initialVideoId || 'zSWdZVtXT7E', // Default Interstellar IMAX preview if none provided
-      videoTitle: initialTitle || 'Interstellar - Official 4K IMAX Sequence | Warner Bros.',
-      duration: 2535,
+      videoId: initialVideoId || '',
+      videoTitle: initialVideoId ? (initialTitle || 'YouTube Video') : 'No video selected',
+      duration: 0,
       isPlaying: false,
       currentTime: 0,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      version: 0
     };
   }
 
@@ -52,6 +59,7 @@ export class Room {
     const existing = this.participants.get(userId);
     let role: Role = 'PARTICIPANT';
 
+    // Host assignment logic: creator, or matches hostId, or first user in empty room
     if (isCreator || !this.hostId || this.hostId === userId) {
       role = 'HOST';
       this.hostId = userId;
@@ -90,7 +98,7 @@ export class Room {
     const participant = this.participants.get(userId);
     if (participant) {
       this.participants.delete(userId);
-      // If host left and there are other participants, promote the first moderator or participant
+      // If host left and there are other participants, promote first moderator or any participant
       if (this.hostId === userId && this.participants.size > 0) {
         let newHost: Participant | undefined;
         for (const p of this.participants.values()) {
@@ -133,12 +141,14 @@ export class Room {
     this.playbackState.currentTime = effective;
     this.playbackState.isPlaying = isPlaying;
     this.playbackState.updatedAt = Date.now();
+    this.playbackState.version += 1;
     return { ...this.playbackState };
   }
 
   public seek(time: number): PlaybackState {
     this.playbackState.currentTime = Math.max(0, time);
     this.playbackState.updatedAt = Date.now();
+    this.playbackState.version += 1;
     return { ...this.playbackState };
   }
 
@@ -149,6 +159,7 @@ export class Room {
     this.playbackState.currentTime = 0;
     this.playbackState.isPlaying = false;
     this.playbackState.updatedAt = Date.now();
+    this.playbackState.version += 1;
     return { ...this.playbackState };
   }
 
@@ -229,13 +240,18 @@ export class RoomManager {
   private rooms: Map<string, Room> = new Map();
   private socketToRoom: Map<string, string> = new Map(); // socketId -> roomId
 
-  public createRoom(roomName?: string, initialVideoId?: string, initialTitle?: string): Room {
+  public createRoom(
+    roomName?: string,
+    initialVideoId?: string,
+    initialTitle?: string,
+    initialHostId?: string
+  ): Room {
     let roomId = generateRoomCode();
     while (this.rooms.has(roomId)) {
       roomId = generateRoomCode();
     }
 
-    const room = new Room(roomId, roomName, initialVideoId, initialTitle);
+    const room = new Room(roomId, roomName, initialVideoId, initialTitle, initialHostId);
     this.rooms.set(roomId, room);
     return room;
   }
@@ -260,13 +276,12 @@ export class RoomManager {
     if (!room) return {};
 
     const participant = room.removeParticipantBySocketId(socketId);
-    // If room is completely empty, clean it up after a grace period or keep for quick rejoin
     if (room.participants.size === 0) {
       setTimeout(() => {
         if (room.participants.size === 0) {
           this.rooms.delete(roomId);
         }
-      }, 1000 * 60 * 15); // 15-minute persistence for empty room
+      }, 1000 * 60 * 30); // 30-minute persistence for empty room
     }
     return { room, participant };
   }

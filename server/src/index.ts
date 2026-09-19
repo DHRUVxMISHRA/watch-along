@@ -51,7 +51,7 @@ app.get('/api/health', (_req: Request, res: Response) => {
 // Create Room
 app.post('/api/rooms', (req: Request, res: Response): void => {
   try {
-    const { roomName, videoUrl, videoTitle } = req.body;
+    const { roomName, videoUrl, videoTitle, userId } = req.body;
 
     let initialVideoId: string | undefined = undefined;
     if (videoUrl && typeof videoUrl === 'string' && videoUrl.trim()) {
@@ -63,7 +63,13 @@ app.post('/api/rooms', (req: Request, res: Response): void => {
       initialVideoId = extracted;
     }
 
-    const room = roomManager.createRoom(roomName, initialVideoId, videoTitle);
+    const room = roomManager.createRoom(
+      roomName,
+      initialVideoId,
+      videoTitle,
+      userId && typeof userId === 'string' ? userId.trim() : undefined
+    );
+
     res.status(201).json({
       success: true,
       room: room.toData()
