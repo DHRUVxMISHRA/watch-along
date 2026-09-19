@@ -287,7 +287,12 @@ export function setupSocketHandlers(io: Server<ClientToServerEvents, ServerToCli
           const updated = room.seek(request.payload.time);
           io.to(`room:${room.roomId}`).emit('sync_state', updated);
         } else if (request.action === 'change_video' && request.payload && request.payload.videoId) {
-          const updated = room.changeVideo(request.payload.videoId, request.payload.title, request.payload.duration);
+          const videoId = extractYouTubeVideoId(request.payload.videoId);
+          if (!videoId) {
+            if (callback) callback({ success: false, error: 'Invalid YouTube video ID provided.' });
+            return;
+          }
+          const updated = room.changeVideo(videoId, request.payload.title, request.payload.duration);
           io.to(`room:${room.roomId}`).emit('sync_state', updated);
         }
       }

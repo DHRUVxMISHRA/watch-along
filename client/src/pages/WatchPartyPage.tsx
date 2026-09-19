@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Participant, Role, PlaybackState, PermissionRequest, ToastMessage } from '../types';
 import { useYouTubePlayer } from '../hooks/useYouTubePlayer';
-import { formatTime, extractYouTubeVideoId } from '../utils/youtube';
+import { formatTime } from '../utils/youtube';
 import { socket } from '../services/socket';
 
 interface WatchPartyPageProps {
@@ -271,14 +271,8 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
     e.preventDefault();
     if (!changeVideoInput.trim()) return;
 
-    const extractedId = extractYouTubeVideoId(changeVideoInput);
-    if (!extractedId) {
-      onShowToast('Invalid Video URL', 'Please enter a valid YouTube video link or ID.', 'error');
-      return;
-    }
-
     setIsChangingVideo(true);
-    socket.emit('change_video', { videoId: extractedId }, (res) => {
+    socket.emit('change_video', { videoId: changeVideoInput.trim() }, (res) => {
       setIsChangingVideo(false);
       if (res.success) {
         onShowToast('Video Changed', 'Room media updated successfully', 'success');
@@ -299,12 +293,7 @@ export const WatchPartyPage: React.FC<WatchPartyPageProps> = ({
         onShowToast('URL Required', 'Please enter the YouTube URL you wish to play.', 'error');
         return;
       }
-      const extractedId = extractYouTubeVideoId(proposedVideoUrl);
-      if (!extractedId) {
-        onShowToast('Invalid URL', 'Please enter a valid YouTube video link.', 'error');
-        return;
-      }
-      payload = { videoId: extractedId };
+      payload = { videoId: proposedVideoUrl.trim() };
     }
 
     socket.emit('permission_request', { action: requestedAction, payload }, (res) => {

@@ -56,7 +56,10 @@ export function useYouTubePlayer({ elementId, onLocalPlay, onLocalPause, onLocal
           if (event.data === 1) callbacksRef.current.onLocalPlay?.();
           if (event.data === 2) callbacksRef.current.onLocalPause?.();
         },
-        onError: (error: any) => console.warn('[YouTube Player Error]', error)
+        onError: (error: any) => console.error('[YouTube Player Error]', {
+          code: error?.data,
+          videoId: currentVideoIdRef.current || pendingRemoteRef.current?.videoId || null
+        })
       }
     });
   }, [elementId]);
@@ -78,7 +81,10 @@ export function useYouTubePlayer({ elementId, onLocalPlay, onLocalPause, onLocal
     const state = { videoId, isPlaying, time: Math.max(0, time) };
     pendingRemoteRef.current = state;
     if (!playerRef.current || !isReady) {
-      currentVideoIdRef.current = videoId;
+      // This is display state only.  Do not update currentVideoIdRef until the
+      // ready player has actually received cueVideoById/loadVideoById.
+      // Otherwise the pending initial state looks already loaded and skips the
+      // only call that tells the iframe which video to load.
       setCurrentVideoId(videoId);
       instantiatePlayer();
       return;

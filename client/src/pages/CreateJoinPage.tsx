@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { extractYouTubeVideoId } from '../utils/youtube';
 
 interface CreateJoinPageProps {
   initialCode?: string;
@@ -71,19 +70,6 @@ export const CreateJoinPage: React.FC<CreateJoinPageProps> = ({
     if (!hostName.trim()) {
       onShowToast('Name Required', 'Please enter your display name before creating a room.', 'error');
       return;
-    }
-
-    // Validate YouTube URL only if supplied
-    if (videoUrl.trim()) {
-      const extracted = extractYouTubeVideoId(videoUrl);
-      if (!extracted) {
-        onShowToast(
-          'Invalid YouTube URL',
-          'Please enter a valid YouTube video URL or leave it empty.',
-          'error'
-        );
-        return;
-      }
     }
 
     setIsCreating(true);

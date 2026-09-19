@@ -6,7 +6,6 @@ import { CreateJoinPage } from './pages/CreateJoinPage';
 import { WatchPartyPage } from './pages/WatchPartyPage';
 import { ToastMessage, RoomData, Role } from './types';
 import { socket, getOrCreateUserId } from './services/socket';
-import { extractYouTubeVideoId } from './utils/youtube';
 
 export const App: React.FC = () => {
   // Navigation state
@@ -149,8 +148,9 @@ export const App: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           roomName: roomName || 'Watch Party',
-          // Create and change-video both send a canonical YouTube video ID.
-          videoUrl: videoUrl ? extractYouTubeVideoId(videoUrl) || undefined : undefined,
+          // The server owns the single canonical YouTube parser for both
+          // creation and live video changes.
+          videoUrl: videoUrl || undefined,
           userId,
           username: finalHostName
         })
